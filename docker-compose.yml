@@ -37,6 +37,7 @@ services:
     networks:
       - rag-network
 
+
   # GLiNER + BERTimbau NER (Torch CPU). Só sobe com --profile gliner
   gliner-bert:
     profiles: ["gliner"]
@@ -68,6 +69,7 @@ services:
       start_period: 180s
     networks:
       - rag-network
+
 
   # GLiNER treino GPU (profile gliner-train). Mesmo hostname da rede: gliner-bert
   gliner-bert-gpu:
@@ -111,6 +113,7 @@ services:
     networks:
       - rag-network
 
+
   # Qdrant Vector Database
   qdrant:
     container_name: qdrant
@@ -137,11 +140,14 @@ services:
     networks:
       - rag-network
 
+
   # MinIO para armazenamento de arquivos
   minio:
     container_name: minio
-    image: quay.io/minio/minio:RELEASE.2023-03-20T20-16-18Z
+    image: quay.io/minio/minio:latest
     environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
     ports:
@@ -157,6 +163,7 @@ services:
       retries: 3
     networks:
       - rag-network
+
 
   # PostgreSQL - Memória do Chat para n8n
   postgres:
@@ -181,6 +188,7 @@ services:
     networks:
       - rag-network
 
+
   # pgAdmin - Interface web para o PostgreSQL
   pgadmin:
     container_name: pgadmin
@@ -200,6 +208,7 @@ services:
         condition: service_healthy
     networks:
       - rag-network
+
 
   # n8n - Automação e Orquestração de Workflows
   n8n:
@@ -241,9 +250,11 @@ services:
     networks:
       - rag-network
 
+
 networks:
   rag-network:
     driver: bridge
 
+
 volumes:
-  pgadmin_data: 
+  pgadmin_data:
