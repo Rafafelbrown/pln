@@ -41,7 +41,7 @@ O RAG-Demo é uma plataforma voltada para alunos da disciplina de **Processament
 - **Frontend**: Interface responsiva com Tailwind CSS e JavaScript vanilla
 - **Backend**: Flask com APIs REST e Socket.IO para tempo real
 - **Vector Store**: Qdrant para armazenamento de vetores e embeddings
-- **Storage**: MinIO para armazenamento de arquivos e documentos
+- **Storage**: armazenamento local em disco por padrão (`data/storage`); MinIO disponível como opção avançada (S3-compatible)
 - **Database**: PostgreSQL para histórico de conversas e sessões de chat
 - **pgAdmin**: Interface web para administração do PostgreSQL
 - **Session System**: Sistema completo de gerenciamento de sessões com persistência
@@ -50,6 +50,17 @@ O RAG-Demo é uma plataforma voltada para alunos da disciplina de **Processament
 - **LLMs**: OpenAI GPT-4o-mini e Google Gemini para processamento
 - **Containers**: Docker Compose para orquestração completa
 - **GLiNER/BERTimbau** (padrão, desativável): container `gliner-bert` com PyTorch CPU (`GLINER_BERT=true` em `env.example`)
+
+### 📚 Documentação técnica
+
+- [Índice da documentação](docs/README.md)
+- [Arquitetura e fluxos](docs/arquitetura.md)
+- [Referência da API](docs/api.md)
+- [Guia de desenvolvimento](docs/desenvolvimento.md)
+- [Busca por similaridade](docs/busca-por-similaridade.md)
+- [Busca híbrida](docs/busca-hibrida.md)
+- [Entidades com TF-IDF e NER](docs/entidades-tfidf-ner.md)
+- [GLiNER e BERTimbau](docs/gliner-bertimbau.md)
 
 ## 🚀 Instalação e Configuração
 
@@ -278,7 +289,7 @@ O script:
 
 - cria `.env` a partir de `env.example` (se ainda não existir);
 - pede para você colar a `OPENAI_API_KEY`;
-- sobe todos os serviços (app, Qdrant, MinIO, PostgreSQL, pgAdmin, n8n).
+- sobe todos os serviços (app, Qdrant, PostgreSQL, pgAdmin, n8n). MinIO é opcional (`--profile minio`).
 
 #### Sobre `./setup.sh --dev`
 
@@ -366,9 +377,10 @@ docker compose --profile gliner up -d --force-recreate rag-demo-app
 |---------|------------|---------------------------|
 | **RAG-Demo** | http://localhost:5000 | — |
 | Qdrant | http://localhost:6333/dashboard | — |
-| MinIO | http://localhost:9001 | `minioadmin` / `minioadmin` |
 | PostgreSQL | `localhost:5432` | `chat_user` / `chat_password` |
 | pgAdmin | http://localhost:5050 | `admin@example.com` / `admin` |
+
+> MinIO é opcional (uso avançado). Se habilitado com `docker compose --profile minio up -d`, o console fica em http://localhost:9001 (`minioadmin` / `minioadmin`).
 | n8n | http://localhost:5678 | `admin` / `admin123` |
 | GLiNER (padrão) | http://localhost:8080/health | — (sobe com `--profile gliner`, ligado por padrão) |
 
@@ -403,7 +415,7 @@ Use se o script automático falhar e você quiser subir o stack na mão:
 cd ~/pln
 cp env.example .env
 nano .env   # preencha OPENAI_API_KEY=sk-...
-mkdir -p uploads volumes/{minio,qdrant,postgres,n8n}
+mkdir -p uploads data/storage volumes/{qdrant,postgres,n8n}
 docker compose --profile gliner up -d --build   # GLiNER já vem true em env.example
 docker compose --profile gliner logs -f rag-demo-app
 ```
@@ -460,10 +472,10 @@ No pgAdmin (http://localhost:5050), use o host **`postgres`** (rede Docker), nã
 
 ### 1. 📤 Upload de Documentos
 
-- **Formatos suportados**: PDF, DOCX, TXT, MD (até 10MB)
+- **Formatos suportados**: TXT, PDF, DOC, DOCX, MD, RTF e JSON (até 20 MB)
 - **Processamento automático**: LLM melhora formatação e estrutura
 - **Vetorização**: Conversão para embeddings via OpenAI ou Google Gemini
-- **Armazenamento**: Documentos no MinIO, vetores no Qdrant
+- **Armazenamento**: Documentos em disco local (ou MinIO, se habilitado), vetores no Qdrant
 
 ### 2. 🗂️ Gerenciamento de Collections
 
@@ -599,7 +611,7 @@ GET    http://localhost:5678/api     # API n8n
 │   ├── 📄 vector_store.py         # Interface Qdrant + embeddings
 │   ├── 📄 document_processor.py   # Processamento de documentos
 │   ├── 📄 qa_generator.py         # Geração de Q&A com LLM
-│   ├── 📄 storage.py              # Gerenciamento MinIO
+│   ├── 📄 storage.py              # Gerenciamento de storage (local por padrão / MinIO opcional)
 │   ├── 📄 chat_rag_service.py     # Serviço de chat RAG
 │   ├── 📄 semantic_search_service.py # Serviço de busca semântica
 │   ├── 📄 sparse_encoder.py       # Tokenização BM25 / vetor esparso
@@ -615,8 +627,9 @@ GET    http://localhost:5678/api     # API n8n
 │   ├── 📁 css/                    # Estilos CSS
 │   ├── 📁 js/                     # JavaScript
 │   └── 📁 images/                 # Imagens e ícones
+├── 📁 data/storage/                # Arquivos de documentos (storage local, padrão)
 ├── 📁 volumes/                     # Dados persistentes
-│   ├── 📁 minio/                  # Arquivos no MinIO
+│   ├── 📁 minio/                  # Arquivos no MinIO (apenas se habilitado)
 │   ├── 📁 postgres/               # Dados do PostgreSQL
 │   ├── 📁 qdrant/                 # Vetores no Qdrant
 │   ├── 📁 huggingface/            # Cache dos modelos GLiNER/BERTimbau
@@ -705,7 +718,10 @@ GEMINI_MODEL=gemini-1.5-flash
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
 
-# MinIO
+# Armazenamento local por padrão (arquivos ficam em data/storage)
+USE_MINIO=false
+
+# MinIO (opcional, uso avançado: docker compose --profile minio up)
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
@@ -777,7 +793,7 @@ cp env.example .env
 # Editar .env conforme necessário
 
 # 3. Iniciar apenas serviços externos
-docker-compose up -d qdrant minio
+docker-compose up -d qdrant
 
 # 4. Executar aplicação
 python app.py
@@ -1241,7 +1257,9 @@ docker compose logs qdrant
 docker compose ps qdrant
 ```
 
-**MinIO sem acesso**
+**MinIO sem acesso (apenas se você optou por habilitá-lo)**
+
+Por padrão o storage é local em disco (`data/storage`) e o MinIO não sobe. Se você habilitou com `docker compose --profile minio up -d`:
 
 - Console: http://localhost:9001  
 - Login padrão: `minioadmin` / `minioadmin`  
@@ -1349,7 +1367,7 @@ Se o erro persistir mesmo com `protobuf==5.29.6`, confira se não há um `requir
 
 ### 5. Volumes e permissões
 
-**Volumes do n8n / PostgreSQL / Qdrant / MinIO não populam em `volumes/`**
+**Volumes do n8n / PostgreSQL / Qdrant não populam em `volumes/`**
 
 Correção automática:
 
@@ -1364,7 +1382,6 @@ docker compose down
 sudo chown -R 1000:1000 volumes/n8n/
 sudo chown -R 70:70 volumes/postgres/
 sudo chown -R 1000:1000 volumes/qdrant/
-sudo chown -R 1000:1000 volumes/minio/
 docker compose up -d
 ```
 
@@ -1374,8 +1391,9 @@ Verificação:
 ls -la volumes/n8n/
 sudo ls -la volumes/postgres/
 ls -la volumes/qdrant/
-ls -la volumes/minio/
 ```
+
+> Se você habilitou o MinIO (`--profile minio`), o mesmo problema de UID pode ocorrer em `volumes/minio/`: rode `sudo chown -R 1000:1000 volumes/minio/` da mesma forma.
 
 ---
 
@@ -1414,7 +1432,7 @@ Ou via script:
 
 ## 📄 Licença
 
-Este projeto está sob a **MIT License** - veja [LICENSE](LICENSE) para detalhes.
+Este projeto está sob a **MIT License**.
 
 ## 🙏 Agradecimentos
 
